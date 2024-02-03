@@ -142,6 +142,7 @@ class BP_Admin {
 	 * @since 1.6.0
 	 */
 	private function includes() {
+		require $this->admin_dir . 'bp-core-admin-dashboard.php';
 		require $this->admin_dir . 'bp-core-admin-actions.php';
 		require $this->admin_dir . 'bp-core-admin-settings.php';
 		require $this->admin_dir . 'bp-core-admin-functions.php';
@@ -211,6 +212,9 @@ class BP_Admin {
 
 		// Official BuddyPress supported Add-ons.
 		add_action( 'install_plugins_bp-add-ons', array( $this, 'display_addons_table' ) );
+
+		// Community / Content Dashboard switch.
+		add_action( 'in_admin_header', array( $this, 'dashboard_switcher' ) );
 
 		/* Filters ***********************************************************/
 
@@ -438,34 +442,94 @@ class BP_Admin {
 	 * @since 2.5.0
 	 */
 	public function site_admin_menus() {
-		if ( ! bp_current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
 		$hooks = array();
 
-		// Appearance > Emails.
-		$hooks[] = add_theme_page(
-			_x( 'Emails', 'screen heading', 'buddypress' ),
-			_x( 'Emails', 'screen heading', 'buddypress' ),
-			$this->capability,
-			'bp-emails-customizer-redirect',
-			'bp_email_redirect_to_customizer'
-		);
+		if ( bp_current_user_can( 'bp_moderate' ) ) {
+			$hooks[] = add_dashboard_page(
+				_x( 'BuddyPress', 'dashboard', 'buddypress' ),
+				_x( 'BuddyPress', 'dashboard', 'buddypress' ),
+				$this->capability,
+				'buddypress',
+				'bp_core_admin_dashboard',
+				1
+			);
+		}
 
-		// Emails > Customize.
-		$hooks[] = add_submenu_page(
-			'edit.php?post_type=' . bp_get_email_post_type(),
-			_x( 'Customize', 'email menu label', 'buddypress' ),
-			_x( 'Customize', 'email menu label', 'buddypress' ),
-			$this->capability,
-			'bp-emails-customizer-redirect',
-			'bp_email_redirect_to_customizer'
-		);
+		if ( bp_current_user_can( 'manage_options' ) ) {
+			// Appearance > Emails.
+			$hooks[] = add_theme_page(
+				_x( 'Emails', 'screen heading', 'buddypress' ),
+				_x( 'Emails', 'screen heading', 'buddypress' ),
+				$this->capability,
+				'bp-emails-customizer-redirect',
+				'bp_email_redirect_to_customizer'
+			);
+
+			// Emails > Customize.
+			$hooks[] = add_submenu_page(
+				'edit.php?post_type=' . bp_get_email_post_type(),
+				_x( 'Customize', 'email menu label', 'buddypress' ),
+				_x( 'Customize', 'email menu label', 'buddypress' ),
+				$this->capability,
+				'bp-emails-customizer-redirect',
+				'bp_email_redirect_to_customizer'
+			);
+		}
+
+		if ( ! $hooks ) {
+			return;
+		}
 
 		foreach( $hooks as $hook ) {
 			add_action( "admin_head-$hook", 'bp_core_modify_admin_menu_highlight' );
 		}
+	}
+
+	/**
+	 * HTML Ouptut to Switch between WordPress & BuddyPress Dashboards.
+	 *
+	 * @since 14.0.0
+	 */
+	public function dashboard_switcher() {
+		$wordpress_dash_url  = get_admin_url();
+		$buddypress_dash_url = add_query_arg( 'page', 'buddypress', $wordpress_dash_url );
+		$current             = isset( $_GET['page'] ) && 'buddypress' === sanitize_text_field( wp_unslash( $_GET['page'] ) );
+
+		$dashboards = array(
+			array(
+				'id'                => 'wordpress',
+				'link'              => $wordpress_dash_url,
+				'sreen_reader_text' => __( 'WordPress Dashboard', 'buddypress' ),
+				'dashicon'          => 'dashicons-wordpress',
+			),
+		);
+
+		$buddypress_dash = array(
+			'id'                => 'buddypress',
+			'link'              => $buddypress_dash_url,
+			'sreen_reader_text' => __( 'BuddyPress Dashboard', 'buddypress' ),
+			'dashicon'          => 'dashicons-buddicons-buddypress-logo',
+		);
+
+		if ( $current ) {
+			array_unshift( $dashboards, $buddypress_dash );
+		} else {
+			$dashboards[] = $buddypress_dash;
+		}
+		?>
+		<div id="bp-dashboard-switcher">
+			<ul>
+				<?php foreach ( $dashboards as $dashboard ) : ?>
+					<li>
+						<a href="<?php echo esc_url( $dashboard['link'] ); ?>" <?php echo ( ( ! $current && 'wordpress' === $dashboard['id'] ) || ( $current && 'buddypress' === $dashboard['id'] ) ) ? 'class="current"' : ''; ?>>
+							<span class="screen-reader-text"><?php echo esc_html( $dashboard['sreen_reader_text'] ); ?></span>
+							<span class="dashicons <?php echo sanitize_html_class( $dashboard['dashicon'] ); ?>"></span>
+						</a>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+		<?php
 	}
 
 	/**
@@ -698,6 +762,65 @@ class BP_Admin {
 				'modalLabel'   => __( 'Hello BuddyPress', 'buddypress' ),
 			) );
 		}
+
+		wp_add_inline_style(
+			'common',
+			'#wpwrap {
+				margin-left: 40px;
+				width: calc(100% - 40px);
+			}
+
+			#bp-dashboard-switcher {
+				position: absolute;
+				top: 0;
+				left: -40px;
+				height: 100%;
+				width: 40px;
+				background-color: #2c3338;
+				color: #FFF;
+			}
+
+			#bp-dashboard-switcher > ul {
+				position: fixed;
+				margin-top: 12px;
+				width: 40px;
+			}
+
+			#bp-dashboard-switcher > ul > li {
+				border: none;
+				min-height: 34px;
+				position: relative;
+				width: 100%;
+			}
+
+			#bp-dashboard-switcher > ul > li > a {
+				display: block;
+				font-size: 14px;
+				font-weight: 400;
+				line-height: 1.3;
+				padding: 0;
+				margin: 0 auto;
+				border: none;
+				text-decoration: none;
+				overflow: hidden;
+			}
+
+			#bp-dashboard-switcher > ul > li > a .dashicons {
+				float: left;
+				width: 36px;
+				height: 30px;
+				margin: 0;
+				text-align: center;
+				color: #f0f0f1;
+				line-height: 1.3;
+				padding-top: 4px;
+			}
+
+			#bp-dashboard-switcher > ul > li > a.current {
+				background: #2271b1;
+				color: #fff;
+			}'
+		);
 	}
 
 	/**
