@@ -236,8 +236,6 @@ class BP_Activity_Activity {
 	public function save() {
 		global $wpdb;
 
-		$bp = buddypress();
-
 		$this->id                = apply_filters_ref_array( 'bp_activity_id_before_save',                array( $this->id,                &$this ) );
 		$this->item_id           = apply_filters_ref_array( 'bp_activity_item_id_before_save',           array( $this->item_id,           &$this ) );
 		$this->secondary_item_id = apply_filters_ref_array( 'bp_activity_secondary_item_id_before_save', array( $this->secondary_item_id, &$this ) );
@@ -306,14 +304,45 @@ class BP_Activity_Activity {
 			$this->primary_link = bp_loggedin_user_url();
 		}
 
+		$data = array(
+			'user_id'           => $this->user_id,
+			'component'         => $this->component,
+			'type'              => $this->type,
+			'action'            => $this->action,
+			'content'           => $this->content,
+			'primary_link'      => $this->primary_link,
+			'date_recorded'     => $this->date_recorded,
+			'item_id'           => $this->item_id,
+			'secondary_item_id' => $this->secondary_item_id,
+			'hide_sitewide'     => $this->hide_sitewide,
+			'mptt_left'         => is_null( $this->mptt_left ) ? 0 : $this->mptt_left,
+			'mptt_right'        => is_null( $this->mptt_right ) ? 0 : $this->mptt_right,
+			'is_spam'           => $this->is_spam,
+		);
+
+		$data_format    = array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d', '%d', '%d' );
+		$activity_table = buddypress()->activity->table_name;
+
 		// If we have an existing ID, update the activity item, otherwise insert it.
 		if ( ! empty( $this->id ) ) {
-			$q = $wpdb->prepare( "UPDATE {$bp->activity->table_name} SET user_id = %d, component = %s, type = %s, action = %s, content = %s, primary_link = %s, date_recorded = %s, item_id = %d, secondary_item_id = %d, hide_sitewide = %d, is_spam = %d WHERE id = %d", $this->user_id, $this->component, $this->type, $this->action, $this->content, $this->primary_link, $this->date_recorded, $this->item_id, $this->secondary_item_id, $this->hide_sitewide, $this->is_spam, $this->id );
+			$q = $wpdb->update(
+				$activity_table,
+				$data,
+				array(
+					'id' => $this->id,
+				),
+				$data_format,
+				array( '%d' )
+			);
 		} else {
-			$q = $wpdb->prepare( "INSERT INTO {$bp->activity->table_name} ( user_id, component, type, action, content, primary_link, date_recorded, item_id, secondary_item_id, hide_sitewide, is_spam ) VALUES ( %d, %s, %s, %s, %s, %s, %s, %d, %d, %d, %d )", $this->user_id, $this->component, $this->type, $this->action, $this->content, $this->primary_link, $this->date_recorded, $this->item_id, $this->secondary_item_id, $this->hide_sitewide, $this->is_spam );
+			$q = $wpdb->insert(
+				$activity_table,
+				$data,
+				$data_format
+			);
 		}
 
-		if ( false === $wpdb->query( $q ) ) {
+		if ( false === $q ) {
 			return false;
 		}
 
@@ -633,11 +662,16 @@ class BP_Activity_Activity {
 			$where_conditions['date'] = $date_query_sql;
 		}
 
+		/*
+		 * @todo $r['display_comments'] should be deprecated in favor of $r['display_reactions']
+		 */
+		$display_reactions = $r['display_comments'];
+
 		// Alter the query based on whether we want to show activity item
 		// comments in the stream like normal comments or threaded below
 		// the activity.
-		if ( false === $r['display_comments'] || 'threaded' === $r['display_comments'] ) {
-			$excluded_types[] = 'activity_comment';
+		if ( false === $display_reactions || 'threaded' === $display_reactions ) {
+			$excluded_types = bp_get_activity_types_for_role( 'reaction' );
 		}
 
 		// Exclude 'last_activity' items unless the 'action' filter has
@@ -825,8 +859,11 @@ class BP_Activity_Activity {
 				bp_activity_update_meta_cache( $activity_ids );
 			}
 
-			if ( $activities && $r['display_comments'] ) {
-				$activities = BP_Activity_Activity::append_comments( $activities, $r['spam'] );
+			if ( $activities && $display_reactions ) {
+				/*
+				 * This should append all possible reactions.
+				 */
+				$activities = BP_Activity_Activity::append_reactions( $activities, $r['spam'] );
 			}
 
 			// Pre-fetch data associated with activity users and other objects.
@@ -1587,9 +1624,281 @@ class BP_Activity_Activity {
 	}
 
 	/**
+	 * Build an associative array of comments and calculate comments depth.
+	 *
+	 * @since 14.0.0
+	 *
+	 * @param array $descendants The list of activity comments. Required.
+	 * @return array The list of activity comments.
+	 */
+	public static function build_assoc_array_and_calcultate_depth( $descendants ) {
+		$comments = array();
+		$ref      = array();
+
+		// Loop descendants and build an assoc array.
+		foreach ( (array) $descendants as $d ) {
+			$d->children = array();
+
+			// If we have a reference on the parent.
+			if ( isset( $ref[ $d->secondary_item_id ] ) ) {
+				$ref[ $d->secondary_item_id ]->children[ $d->id ] = $d;
+				$ref[ $d->id ] =& $ref[ $d->secondary_item_id ]->children[ $d->id ];
+
+				// If we don't have a reference on the parent, put in the root level.
+			} else {
+				$comments[ $d->id ] = $d;
+				$ref[ $d->id ] =& $comments[ $d->id ];
+			}
+		}
+
+		// Calculate depth for each item.
+		foreach ( $ref as &$r ) {
+			$depth = 1;
+			$parent_id = $r->secondary_item_id;
+
+			while ( $parent_id !== $r->item_id ) {
+				$depth++;
+
+				// When display_comments=stream, the parent comment may not be part of the
+				// returned results, so we manually fetch it.
+				if ( empty( $ref[ $parent_id ] ) ) {
+					$direct_parent = new BP_Activity_Activity( $parent_id );
+					if ( isset( $direct_parent->secondary_item_id ) ) {
+						// If the direct parent is not an activity update, that means we've reached
+						// the parent activity item (eg. new_blog_post).
+						if ( 'activity_update' !== $direct_parent->type ) {
+							$parent_id = $r->item_id;
+
+						} else {
+							$parent_id = $direct_parent->secondary_item_id;
+						}
+
+					} else {
+						// Something went wrong.  Short-circuit the depth calculation.
+						$parent_id = $r->item_id;
+					}
+				} else {
+					$parent_id = $ref[ $parent_id ]->secondary_item_id;
+				}
+			}
+			$r->depth = $depth;
+		}
+
+		return $comments;
+	}
+
+	/**
+	 * Fetch reactions for the activity. Reactions are including comments.
+	 *
+	 * @since 14.0.0
+	 *
+	 * @param array $args {
+	 *     An array of arguments.
+	 *
+	 *     @type integer $activity_id         Activity ID to fetch comments for.
+	 *     @type integer $mptt_left           Left-most node boundary.
+	 *     @type integer $mptt_right          Right-most node boundary.
+	 *     @type string  $spam                Optional. 'ham_only' (default), 'spam_only' or 'all'.
+	 *     @type integer $top_level_parent_id Optional. The id of the root-level parent activity item.
+	 * }
+	 * @return array An associative array containing Activity comments and Activity reactions.
+	 */
+	public static function get_activity_reactions( $args = array() ) {
+		$r = bp_parse_args(
+			$args,
+			array(
+				'activity_id'         => 0,
+				'mptt_left'           => 0,
+				'mptt_right'          => 0,
+				'spam'                => 'ham_only',
+				'top_level_parent_id' => 0,
+			)
+		);
+
+		$activity_id     = (int) $r['activity_id'];
+		$comments_cache  = wp_cache_get( $activity_id, 'bp_activity_comments' );
+		$reactions_cache = wp_cache_get( $activity_id, 'bp_activity_reactions' );
+		$retval          =  array(
+			'comments'  => array(),
+			'reactions' => array(),
+		);
+
+		// We store the string 'none' to cache the fact that the
+		// activity item has no comments.
+		if ( 'none' === $comments_cache && 'none' === $reactions_cache ) {
+			return $retval;
+		}
+
+		if ( empty( $GLOBALS['wpdb'] ) ) {
+			return array();
+		}
+
+		$wpdb           = $GLOBALS['wpdb'];
+		$reaction_types = bp_get_activity_types_for_role( 'reaction' );
+
+		if ( ! empty( $comments_cache ) && 'none' !== $comments_cache ) {
+			$retval['comments'] = (array) $comments_cache;
+
+			if ( 'none' === $reactions_cache ) {
+				$retval['reactions'] = array();
+				$reaction_types      = array();
+			} else {
+				$reaction_types = array_diff( $reaction_types, array( 'activity_comment' ) );
+			}
+		}
+
+		if ( ! $reaction_types ) {
+			return $retval;
+		}
+
+		if ( ! empty( $reactions_cache ) && 'none' !== $reactions_cache ) {
+			$retval['reactions'] = (array) $reactions_cache;
+
+			if ( 'none' === $comments_cache ) {
+				$retval['comments'] = array();
+				$reaction_types     = array();
+			} else {
+				$reaction_types = array( 'activity_comment' );
+			}
+		}
+
+		if ( ! $reaction_types ) {
+			return $retval;
+		}
+
+		if ( empty( $r['top_level_parent_id'] ) ) {
+			$r['top_level_parent_id'] = $activity_id;
+		}
+
+		// Don't retrieve activity comments marked as spam.
+		if ( 'ham_only' == $r['spam'] ) {
+			$spam_sql = 'AND a.is_spam = 0';
+		} elseif ( 'spam_only' == $r['spam'] ) {
+			$spam_sql = 'AND a.is_spam = 1';
+		} else {
+			$spam_sql = '';
+		}
+
+		/*
+		 * This manipulation is necessary to be sure to get reactions
+		 * whether the activity was commented or not.
+		 */
+		if ( 3 > $r['mptt_right'] ) {
+			$r['mptt_right'] = 3;
+		}
+
+		// Only include reaction types.
+		$in  = "'" . implode( "', '", esc_sql( $reaction_types ) ) . "'";
+		$bp  = buddypress();
+		$sql = $wpdb->prepare(
+			"SELECT id FROM {$bp->activity->table_name} a WHERE a.type IN ({$in}) {$spam_sql} AND a.item_id = %d AND a.mptt_left > %d AND a.mptt_left < %d ORDER BY a.date_recorded ASC",
+			$r['top_level_parent_id'],
+			$r['mptt_left'],
+			$r['mptt_right']
+		);
+
+		$reaction_ids = $wpdb->get_col( $sql );
+		$reactions    = self::get_activity_data( $reaction_ids );
+		$reactions    = self::append_user_fullnames( $reactions );
+		$reactions    = self::generate_action_strings( $reactions );
+
+		if ( ! $retval['comments'] ) {
+			$comments = wp_list_filter( $reactions, array( 'type' => 'activity_comment' ) );
+
+			if ( ! $comments ) {
+				$comments_cache_value = 'none';
+			} else {
+				$comments             = self::build_assoc_array_and_calcultate_depth( $comments );
+				$comments_cache_value = $comments;
+			}
+
+			wp_cache_set( $activity_id, $comments_cache_value, 'bp_activity_comments' );
+
+			$retval['comments'] = $comments;
+		}
+
+		if ( ! $retval['reactions'] ) {
+			$reactions = wp_list_filter( $reactions, array( 'type' => 'activity_comment' ), 'NOT' );
+
+			if ( ! $reactions ) {
+				$reactions_cache_value = 'none';
+			} else {
+				$reactions_cache_value = $reactions;
+			}
+
+			wp_cache_set( $activity_id, $reactions_cache_value, 'bp_activity_reactions' );
+
+			$retval['reactions'] = $reactions;
+		}
+
+		// Return comments & reactions.
+		return $retval;
+	}
+
+	/**
+	 * Append activity reactions to their associated activity items.
+	 *
+	 * @since 14.0.0
+	 *
+	 * @param array  $activities Activities to fetch reactions for.
+	 * @param string $spam       Optional. 'ham_only' (default), 'spam_only' or 'all'.
+	 * @return array The updated activities with nested reactions.
+	 */
+	public static function append_reactions( $activities, $spam = 'ham_only' ) {
+		$activity_reactions = array();
+
+		// Now fetch the activity reactions and parse them into the correct position in the activities array.
+		foreach ( (array) $activities as $activity ) {
+			$top_level_parent_id = 0;
+
+			if ( in_array( $activity->type, bp_get_activity_types_for_role( 'reaction' ), true ) ) {
+				$top_level_parent_id = $activity->item_id;
+			}
+
+			$args = array(
+				'activity_id'         => $activity->id,
+				'mptt_left'           => $activity->mptt_left,
+				'mptt_right'          => $activity->mptt_right,
+				'spam'                => $spam,
+				'top_level_parent_id' => $top_level_parent_id,
+			);
+
+			$function_args = array_values( $args );
+
+			/**
+			 * Filters if BuddyPress should use the legacy activity query.
+			 *
+			 * @since 2.0.0
+			 *
+			 * @param bool                 $value     Whether or not to use the legacy query.
+			 * @param BP_Activity_Activity $value     Magic method referring to currently called method.
+			 * @param array                $func_args Array of the method's argument list.
+			 */
+			if ( 'activity_comment' === $activity->type && apply_filters( 'bp_use_legacy_activity_query', false, 'BP_Activity_Activity::get_activity_comments', $function_args ) ) {
+				list( $activity_id, $left, $right, $spam, $top_level_parent_id ) = $function_args;
+				$activity_reactions[ $activity->id ] = BP_Activity_Activity::get_activity_comments( $activity_id, $left, $right, $spam, $top_level_parent_id );
+
+			} else {
+				$activity_reactions[ $activity->id ] = BP_Activity_Activity::get_activity_reactions( $args );
+			}
+		}
+
+		// Merge the reactions with the activity items.
+		foreach ( (array) $activities as $key => $activity ) {
+			if ( isset( $activity_reactions[$activity->id] ) ) {
+				$activities[ $key ]->children  = $activity_reactions[ $activity->id ]['comments'];
+				$activities[ $key ]->reactions = $activity_reactions[ $activity->id ]['reactions'];
+			}
+		}
+
+		return $activities;
+	}
+
+	/**
 	 * Append activity comments to their associated activity items.
 	 *
 	 * @since 1.2.0
+	 * @deprecated 14.0.0
 	 *
 	 * @global wpdb $wpdb WordPress database object.
 	 *
@@ -1598,26 +1907,15 @@ class BP_Activity_Activity {
 	 * @return array The updated activities with nested comments.
 	 */
 	public static function append_comments( $activities, $spam = 'ham_only' ) {
-		$activity_comments = array();
+		_deprecated_function( __METHOD__, '14.0.0' );
 
-		// Now fetch the activity comments and parse them into the correct position in the activities array.
-		foreach ( (array) $activities as $activity ) {
-			$top_level_parent_id = 'activity_comment' == $activity->type ? $activity->item_id : 0;
-			$activity_comments[$activity->id] = BP_Activity_Activity::get_activity_comments( $activity->id, $activity->mptt_left, $activity->mptt_right, $spam, $top_level_parent_id );
-		}
-
-		// Merge the comments with the activity items.
-		foreach ( (array) $activities as $key => $activity ) {
-			if ( isset( $activity_comments[$activity->id] ) ) {
-				$activities[$key]->children = $activity_comments[$activity->id];
-			}
-		}
-
-		return $activities;
+		return self::append_reactions( $activities, $spam );
 	}
 
 	/**
 	 * Get activity comments that are associated with a specific activity ID.
+	 *
+	 * Legacy query - not recommended.
 	 *
 	 * @since 1.2.0
 	 *
@@ -1632,8 +1930,6 @@ class BP_Activity_Activity {
 	 */
 	public static function get_activity_comments( $activity_id, $left, $right, $spam = 'ham_only', $top_level_parent_id = 0 ) {
 		global $wpdb;
-
-		$function_args = func_get_args();
 
 		if ( empty( $top_level_parent_id ) ) {
 			$top_level_parent_id = $activity_id;
@@ -1672,95 +1968,22 @@ class BP_Activity_Activity {
 				$spam_sql = '';
 			}
 
-			// Legacy query - not recommended.
-
 			/**
-			 * Filters if BuddyPress should use the legacy activity query.
+			 * Filters the MySQL prepared statement for the legacy activity query.
 			 *
-			 * @since 2.0.0
+			 * @since 1.5.0
 			 *
-			 * @param bool                 $value     Whether or not to use the legacy query.
-			 * @param BP_Activity_Activity $value     Magic method referring to currently called method.
-			 * @param array                $func_args Array of the method's argument list.
+			 * @param string $value       Prepared statement for the activity query.
+			 * @param int    $activity_id Activity ID to fetch comments for.
+			 * @param int    $left        Left-most node boundary.
+			 * @param int    $right       Right-most node boundary.
+			 * @param string $spam_sql    SQL Statement portion to differentiate between ham or spam.
 			 */
-			if ( apply_filters( 'bp_use_legacy_activity_query', false, __METHOD__, $function_args ) ) {
+			$sql = apply_filters( 'bp_activity_comments_user_join_filter', $wpdb->prepare( "SELECT a.*, u.user_email, u.user_nicename, u.user_login, u.display_name{$fullname_select} FROM {$bp->activity->table_name} a, {$wpdb->users} u{$fullname_from} WHERE u.ID = a.user_id {$fullname_where} AND a.type = 'activity_comment' {$spam_sql} AND a.item_id = %d AND a.mptt_left > %d AND a.mptt_left < %d ORDER BY a.date_recorded ASC", $top_level_parent_id, $left, $right ), $activity_id, $left, $right, $spam_sql );
 
-				/**
-				 * Filters the MySQL prepared statement for the legacy activity query.
-				 *
-				 * @since 1.5.0
-				 *
-				 * @param string $value       Prepared statement for the activity query.
-				 * @param int    $activity_id Activity ID to fetch comments for.
-				 * @param int    $left        Left-most node boundary.
-				 * @param int    $right       Right-most node boundary.
-				 * @param string $spam_sql    SQL Statement portion to differentiate between ham or spam.
-				 */
-				$sql = apply_filters( 'bp_activity_comments_user_join_filter', $wpdb->prepare( "SELECT a.*, u.user_email, u.user_nicename, u.user_login, u.display_name{$fullname_select} FROM {$bp->activity->table_name} a, {$wpdb->users} u{$fullname_from} WHERE u.ID = a.user_id {$fullname_where} AND a.type = 'activity_comment' {$spam_sql} AND a.item_id = %d AND a.mptt_left > %d AND a.mptt_left < %d ORDER BY a.date_recorded ASC", $top_level_parent_id, $left, $right ), $activity_id, $left, $right, $spam_sql );
+			$descendants = $wpdb->get_results( $sql );
 
-				$descendants = $wpdb->get_results( $sql );
-
-				// We use the mptt BETWEEN clause to limit returned
-				// descendants to the correct part of the tree.
-			} else {
-				$sql = $wpdb->prepare( "SELECT id FROM {$bp->activity->table_name} a WHERE a.type = 'activity_comment' {$spam_sql} AND a.item_id = %d and a.mptt_left > %d AND a.mptt_left < %d ORDER BY a.date_recorded ASC", $top_level_parent_id, $left, $right );
-
-				$descendant_ids = $wpdb->get_col( $sql );
-				$descendants    = self::get_activity_data( $descendant_ids );
-				$descendants    = self::append_user_fullnames( $descendants );
-				$descendants    = self::generate_action_strings( $descendants );
-			}
-
-			$ref = array();
-
-			// Loop descendants and build an assoc array.
-			foreach ( (array) $descendants as $d ) {
-				$d->children = array();
-
-				// If we have a reference on the parent.
-				if ( isset( $ref[ $d->secondary_item_id ] ) ) {
-					$ref[ $d->secondary_item_id ]->children[ $d->id ] = $d;
-					$ref[ $d->id ] =& $ref[ $d->secondary_item_id ]->children[ $d->id ];
-
-					// If we don't have a reference on the parent, put in the root level.
-				} else {
-					$comments[ $d->id ] = $d;
-					$ref[ $d->id ] =& $comments[ $d->id ];
-				}
-			}
-
-			// Calculate depth for each item.
-			foreach ( $ref as &$r ) {
-				$depth = 1;
-				$parent_id = $r->secondary_item_id;
-
-				while ( $parent_id !== $r->item_id ) {
-					$depth++;
-
-					// When display_comments=stream, the parent comment may not be part of the
-					// returned results, so we manually fetch it.
-					if ( empty( $ref[ $parent_id ] ) ) {
-						$direct_parent = new BP_Activity_Activity( $parent_id );
-						if ( isset( $direct_parent->secondary_item_id ) ) {
-							// If the direct parent is not an activity update, that means we've reached
-							// the parent activity item (eg. new_blog_post).
-							if ( 'activity_update' !== $direct_parent->type ) {
-								$parent_id = $r->item_id;
-
-							} else {
-								$parent_id = $direct_parent->secondary_item_id;
-							}
-
-						} else {
-							// Something went wrong.  Short-circuit the depth calculation.
-							$parent_id = $r->item_id;
-						}
-					} else {
-						$parent_id = $ref[ $parent_id ]->secondary_item_id;
-					}
-				}
-				$r->depth = $depth;
-			}
+			$comments = self::build_assoc_array_and_calcultate_depth( $descendants );
 
 			// If we cache an empty array, it'll count as a cache
 			// miss the next time the activity comments are fetched.
@@ -2049,6 +2272,52 @@ class BP_Activity_Activity {
 
 		// No favorites.
 		return 0;
+	}
+
+	/**
+	 * Returns the activity IDs a user reacted to.
+	 *
+	 * @since 14.0.0
+	 *
+	 * @param integer $user_id       Required. The user ID.
+	 *                               Defaults to the current user ID.
+	 * @param string  $reaction_type Required. The activity type key name of the reaction.
+	 *                               Defaults to `activity_like`.
+	 * @return array The activity IDs a user reacted to.
+	 */
+	public static function get_user_reactions( $user_id, $reaction_type ) {
+
+		if ( ! in_array( $reaction_type, bp_get_activity_types_for_role( 'reaction' ), true ) ) {
+			return array();
+		}
+
+		// Get the user's reactions cache.
+		$user_reactions_cache = wp_cache_get( $user_id, 'bp_activity_user_reactions' );
+
+		if ( 'none' === $user_reactions_cache ) {
+			return array();
+		} elseif ( ! empty( $user_reactions_cache ) ) {
+			return (array) $user_reactions_cache;
+		}
+
+		if ( empty( $GLOBALS['wpdb'] ) ) {
+			return array();
+		}
+
+		$wpdb           = $GLOBALS['wpdb'];
+		$activity_table = buddypress()->activity->table_name;
+		$sql            = $wpdb->prepare( "SELECT item_id FROM {$activity_table} WHERE user_id = %d AND type = %s", $user_id, $reaction_type );
+		$activities     = $wpdb->get_col( $sql );
+
+		$user_reactions_cache_value = $activities;
+		if ( ! $activities ) {
+			$user_reactions_cache_value = 'none';
+		}
+
+		// Set the user's reactions cache.
+		wp_cache_set( $user_id, $user_reactions_cache_value, 'bp_activity_user_reactions' );
+
+		return $activities;
 	}
 
 	/**
