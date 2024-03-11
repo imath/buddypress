@@ -1790,6 +1790,17 @@ class BP_Activity_Activity {
 		// Only include reaction types.
 		$in  = "'" . implode( "', '", esc_sql( $reaction_types ) ) . "'";
 		$bp  = buddypress();
+
+		/**
+		 *
+		 *
+		 * The `AND a.mptt_left > %d AND a.mptt_left < %d` part is only needed when
+		 * displaying comments in 'stream', eg: the User's personal activity feed to
+		 * only get the replies of a specific comment.
+		 *
+		 * When getting interactions/comments about an type !== `activity_comment`. It's not needed.
+		 *
+		 */
 		$sql = $wpdb->prepare(
 			"SELECT id FROM {$bp->activity->table_name} a WHERE a.type IN ({$in}) {$spam_sql} AND a.item_id = %d AND a.mptt_left > %d AND a.mptt_left < %d ORDER BY a.date_recorded ASC",
 			$r['top_level_parent_id'],
@@ -2119,7 +2130,7 @@ class BP_Activity_Activity {
 	 *
 	 * @see BP_Activity_Activity::get_filter_sql()
 	 *
-	 * @global wpdb $wpdb WordPress database object. 
+	 * @global wpdb $wpdb WordPress database object.
 	 *
 	 * @param string     $field The database field.
 	 * @param array|bool $items The values for the IN clause, or false when none are found.
@@ -2242,7 +2253,7 @@ class BP_Activity_Activity {
 	 *
 	 * @since 1.2.0
 	 *
-	 * @global wpdb $wpdb WordPress database object. 
+	 * @global wpdb $wpdb WordPress database object.
 	 *
 	 * @return string ISO timestamp.
 	 */
