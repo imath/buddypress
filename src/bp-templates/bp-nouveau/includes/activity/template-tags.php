@@ -440,56 +440,6 @@ function bp_nouveau_activity_entry_buttons( $args = array() ) {
 			);
 		}
 
-		if ( bp_activity_type_supports( $activity_type, 'likes' ) ) {
-
-			if ( bp_activity_is_liked() ) {
-				$like_props = array(
-					'action'  => 'remove',
-					'id'      => 'alike-dislike-' . $activity_id,
-					'class'   => 'alike-remove',
-					'tooltip' => _x( 'Dislike', 'button', 'buddypress' ),
-					'text'    => _x( 'Liked', 'link', 'buddypress' ),
-				);
-			} else {
-				$like_props = array(
-					'action'  => 'add',
-					'id'      => 'alike-like-' . $activity_id,
-					'class'   => 'alike-add',
-					'tooltip' => _x( 'Like', 'button', 'buddypress' ),
-					'text'    => _x( 'Like', 'link', 'buddypress' ),
-				);
-			}
-
-			$buttons['activity_like'] =  array(
-				'id'                => 'activity_like',
-				'position'          => 20,
-				'component'         => 'activity',
-				'parent_element'    => $parent_element,
-				'parent_attr'       => $parent_attr,
-				'must_be_logged_in' => true,
-				'button_element'    => $button_element,
-				'button_attr'       => array(
-					'id'              => $like_props['id'],
-					'class'           => sprintf( 'button %s bp-primary-action bp-tooltip', $like_props['class'] ),
-					'data-bp-tooltip' => $like_props['tooltip'],
-					'aria-expanded'   => 'false',
-				),
-				'link_text'  => sprintf(
-					'<span class="bp-screen-reader-text">%1$s</span> <span class="like-count">%2$s</span>',
-					$like_props['text'],
-					esc_html( bp_activity_get_like_count() )
-				),
-			);
-
-			// If button element set add href link to data-attr
-			if ( 'button' === $button_element ) {
-				$buttons['activity_like']['button_attr']['data-bp-url'] = bp_get_activity_like_link( $like_props['action'] );
-			} else {
-				$buttons['activity_like']['button_attr']['href'] = bp_get_activity_like_link( $like_props['action'] );
-				$buttons['activity_like']['button_attr']['role'] = 'button';
-			}
-		}
-
 		// The delete button is always created, and removed later on if needed.
 		$delete_args = array();
 

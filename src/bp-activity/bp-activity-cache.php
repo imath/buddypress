@@ -48,12 +48,12 @@ function bp_activity_clear_cache_for_activity( $activity ) {
 	wp_cache_delete( $activity->id, 'bp_activity' );
 	wp_cache_delete( 'bp_activity_sitewide_front', 'bp' );
 
-	// Clear the reactions cache for the parent activity ID.
+	// Clear the interactions cache for the parent activity ID.
 	if ( ! empty( $activity->item_id ) ) {
 		if ( 'activity_comment' === $activity->type ) {
 			wp_cache_delete( $activity->item_id, 'bp_activity_comments' );
-		} elseif ( in_array( $activity->type, bp_get_activity_types_for_role( 'reaction' ), true ) ) {
-			wp_cache_delete( $activity->item_id, 'bp_activity_reactions' );
+		} elseif ( in_array( $activity->type, bp_get_activity_types_for_role( 'interaction' ), true ) ) {
+			wp_cache_delete( $activity->item_id, 'bp_activity_interactions' );
 		}
 	}
 }

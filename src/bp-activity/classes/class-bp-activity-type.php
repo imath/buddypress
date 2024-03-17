@@ -39,7 +39,7 @@ final class BP_Activity_Type {
 	/**
 	 * The role of the activity type.
 	 *
-	 * One of 'content', 'log', 'reaction'.
+	 * One of 'content', 'log', 'interaction'.
 	 *
 	 * @since 14.0.0
 	 * @var string $role
@@ -49,7 +49,7 @@ final class BP_Activity_Type {
 	/**
 	 * The name of the activity feature.
 	 *
-	 * Eg: 'comments', 'likes', etc.
+	 * Eg: 'comments', etc.
 	 *
 	 * @since 14.0.0
 	 * @var string $feature_name
@@ -140,7 +140,7 @@ final class BP_Activity_Type {
 	 */
 	public function set_props( $args ) {
 		$default_prop   = array( 'activity' );
-		$roles          = array( 'content', 'log', 'reaction' );
+		$roles          = array( 'content', 'log', 'interaction' );
 		$this->labels   = new stdClass();
 		$this->supports = new stdClass();
 
@@ -172,9 +172,9 @@ final class BP_Activity_Type {
 			$this->role = 'content';
 		}
 
-		if ( 'reaction' === $this->role ) {
+		if ( 'interaction' === $this->role ) {
 			if ( ! $r['feature_name'] ) {
-				_doing_it_wrong( 'feature_name', __( 'The `feature_name` property of this Activity type (having a reaction role) is required.', 'buddypress' ), 'BuddyPress 14.0.0' );
+				_doing_it_wrong( 'feature_name', __( 'The `feature_name` property of this Activity type (having a interaction role) is required.', 'buddypress' ), 'BuddyPress 14.0.0' );
 			} else {
 				$this->feature_name = sanitize_key( $r['feature_name'] );
 			}

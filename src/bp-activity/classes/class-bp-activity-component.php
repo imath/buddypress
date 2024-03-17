@@ -126,7 +126,7 @@ class BP_Activity_Component extends BP_Component {
 		if ( bp_is_current_component( 'activity' ) ) {
 			// Authenticated actions - Only fires when JS is disabled.
 			if ( is_user_logged_in() &&
-				in_array( bp_current_action(), array( 'delete', 'spam', 'post', 'reply', 'favorite', 'unfavorite', 'like', 'dislike' ), true )
+				in_array( bp_current_action(), array( 'delete', 'spam', 'post', 'reply', 'favorite', 'unfavorite' ), true )
 			) {
 				require_once $this->path . 'bp-activity/actions/' . bp_current_action() . '.php';
 			}
@@ -153,7 +153,6 @@ class BP_Activity_Component extends BP_Component {
 			 * As a result, we need to map filenames with slugs.
 			 */
 			$filenames = array(
-				'likes'     => 'likes',
 				'favorites' => 'favorites',
 				'mentions'  => 'mentions',
 			);
@@ -288,17 +287,6 @@ class BP_Activity_Component extends BP_Component {
 			'generate'        => bp_activity_do_mentions(),
 		);
 
-		// Liked activity items.
-		$sub_nav[] = array(
-			'name'            => _x( 'Likes', 'Profile activity screen sub nav', 'buddypress' ),
-			'slug'            => 'likes',
-			'parent_slug'     => $slug,
-			'screen_function' => 'bp_activity_screen_likes',
-			'position'        => 30,
-			'item_css_id'     => 'activity-likes',
-			'generate'        => bp_activity_supports_likes(),
-		);
-
 		// Favorite activity items.
 		$sub_nav[] = array(
 			'name'            => _x( 'Favorites', 'Profile activity screen sub nav', 'buddypress' ),
@@ -398,17 +386,6 @@ class BP_Activity_Component extends BP_Component {
 				);
 			}
 
-			// Activity likes.
-			if ( bp_activity_supports_likes() ) {
-				$wp_admin_nav[] = array(
-					'parent'   => 'my-account-' . $this->id,
-					'id'       => 'my-account-' . $this->id . '-likes',
-					'title'    => _x( 'Likes', 'My Account Activity sub nav', 'buddypress' ),
-					'href'     => bp_loggedin_user_url( bp_members_get_path_chunks( array( $activity_slug, 'likes' ) ) ),
-					'position' => 30,
-				);
-			}
-
 			// Favorite activity items.
 			if ( bp_activity_can_favorite() ) {
 				$wp_admin_nav[] = array(
@@ -489,8 +466,8 @@ class BP_Activity_Component extends BP_Component {
 			array(
 				'bp_activity',
 				'bp_activity_comments',
-				'bp_activity_reactions',
-				'bp_activity_user_reactions',
+				'bp_activity_interactions',
+				'bp_activity_user_interactions',
 				'activity_meta',
 			)
 		);

@@ -663,15 +663,15 @@ class BP_Activity_Activity {
 		}
 
 		/*
-		 * @todo $r['display_comments'] should be deprecated in favor of $r['display_reactions']
+		 * @todo $r['display_comments'] should be deprecated in favor of $r['display_interactions']
 		 */
-		$display_reactions = $r['display_comments'];
+		$display_interactions = $r['display_comments'];
 
 		// Alter the query based on whether we want to show activity item
 		// comments in the stream like normal comments or threaded below
 		// the activity.
-		if ( false === $display_reactions || 'threaded' === $display_reactions ) {
-			$excluded_types = bp_get_activity_types_for_role( 'reaction' );
+		if ( false === $display_interactions || 'threaded' === $display_interactions ) {
+			$excluded_types = bp_get_activity_types_for_role( 'interaction' );
 		}
 
 		// Exclude 'last_activity' items unless the 'action' filter has
@@ -859,11 +859,11 @@ class BP_Activity_Activity {
 				bp_activity_update_meta_cache( $activity_ids );
 			}
 
-			if ( $activities && $display_reactions ) {
+			if ( $activities && $display_interactions ) {
 				/*
-				 * This should append all possible reactions.
+				 * This should append all possible interactions.
 				 */
-				$activities = BP_Activity_Activity::append_reactions( $activities, $r['spam'] );
+				$activities = BP_Activity_Activity::append_interactions( $activities, $r['spam'] );
 			}
 
 			// Pre-fetch data associated with activity users and other objects.
@@ -1688,7 +1688,7 @@ class BP_Activity_Activity {
 	}
 
 	/**
-	 * Fetch reactions for the activity. Reactions are including comments.
+	 * Fetch interactions for the activity. Interactions are including comments.
 	 *
 	 * @since 14.0.0
 	 *
@@ -1701,9 +1701,9 @@ class BP_Activity_Activity {
 	 *     @type string  $spam                Optional. 'ham_only' (default), 'spam_only' or 'all'.
 	 *     @type integer $top_level_parent_id Optional. The id of the root-level parent activity item.
 	 * }
-	 * @return array An associative array containing Activity comments and Activity reactions.
+	 * @return array An associative array containing Activity comments and Activity interactions.
 	 */
-	public static function get_activity_reactions( $args = array() ) {
+	public static function get_activity_interactions( $args = array() ) {
 		$r = bp_parse_args(
 			$args,
 			array(
@@ -1717,15 +1717,15 @@ class BP_Activity_Activity {
 
 		$activity_id     = (int) $r['activity_id'];
 		$comments_cache  = wp_cache_get( $activity_id, 'bp_activity_comments' );
-		$reactions_cache = wp_cache_get( $activity_id, 'bp_activity_reactions' );
+		$interactions_cache = wp_cache_get( $activity_id, 'bp_activity_interactions' );
 		$retval          =  array(
 			'comments'  => array(),
-			'reactions' => array(),
+			'interactions' => array(),
 		);
 
 		// We store the string 'none' to cache the fact that the
 		// activity item has no comments.
-		if ( 'none' === $comments_cache && 'none' === $reactions_cache ) {
+		if ( 'none' === $comments_cache && 'none' === $interactions_cache ) {
 			return $retval;
 		}
 
@@ -1733,36 +1733,36 @@ class BP_Activity_Activity {
 			return array();
 		}
 
-		$wpdb           = $GLOBALS['wpdb'];
-		$reaction_types = bp_get_activity_types_for_role( 'reaction' );
+		$wpdb              = $GLOBALS['wpdb'];
+		$interaction_types = bp_get_activity_types_for_role( 'interaction' );
 
 		if ( ! empty( $comments_cache ) && 'none' !== $comments_cache ) {
 			$retval['comments'] = (array) $comments_cache;
 
-			if ( 'none' === $reactions_cache ) {
-				$retval['reactions'] = array();
-				$reaction_types      = array();
+			if ( 'none' === $interactions_cache ) {
+				$retval['interactions'] = array();
+				$interaction_types      = array();
 			} else {
-				$reaction_types = array_diff( $reaction_types, array( 'activity_comment' ) );
+				$interaction_types = array_diff( $interaction_types, array( 'activity_comment' ) );
 			}
 		}
 
-		if ( ! $reaction_types ) {
+		if ( ! $interaction_types ) {
 			return $retval;
 		}
 
-		if ( ! empty( $reactions_cache ) && 'none' !== $reactions_cache ) {
-			$retval['reactions'] = (array) $reactions_cache;
+		if ( ! empty( $interactions_cache ) && 'none' !== $interactions_cache ) {
+			$retval['interactions'] = (array) $interactions_cache;
 
 			if ( 'none' === $comments_cache ) {
 				$retval['comments'] = array();
-				$reaction_types     = array();
+				$interaction_types     = array();
 			} else {
-				$reaction_types = array( 'activity_comment' );
+				$interaction_types = array( 'activity_comment' );
 			}
 		}
 
-		if ( ! $reaction_types ) {
+		if ( ! $interaction_types ) {
 			return $retval;
 		}
 
@@ -1780,15 +1780,15 @@ class BP_Activity_Activity {
 		}
 
 		/*
-		 * This manipulation is necessary to be sure to get reactions
+		 * This manipulation is necessary to be sure to get interactions
 		 * whether the activity was commented or not.
 		 */
 		if ( 3 > $r['mptt_right'] ) {
 			$r['mptt_right'] = 3;
 		}
 
-		// Only include reaction types.
-		$in  = "'" . implode( "', '", esc_sql( $reaction_types ) ) . "'";
+		// Only include interaction types.
+		$in  = "'" . implode( "', '", esc_sql( $interaction_types ) ) . "'";
 		$bp  = buddypress();
 
 		/**
@@ -1808,13 +1808,13 @@ class BP_Activity_Activity {
 			$r['mptt_right']
 		);
 
-		$reaction_ids = $wpdb->get_col( $sql );
-		$reactions    = self::get_activity_data( $reaction_ids );
-		$reactions    = self::append_user_fullnames( $reactions );
-		$reactions    = self::generate_action_strings( $reactions );
+		$interaction_ids = $wpdb->get_col( $sql );
+		$interactions    = self::get_activity_data( $interaction_ids );
+		$interactions    = self::append_user_fullnames( $interactions );
+		$interactions    = self::generate_action_strings( $interactions );
 
 		if ( ! $retval['comments'] ) {
-			$comments = wp_list_filter( $reactions, array( 'type' => 'activity_comment' ) );
+			$comments = wp_list_filter( $interactions, array( 'type' => 'activity_comment' ) );
 
 			if ( ! $comments ) {
 				$comments_cache_value = 'none';
@@ -1828,41 +1828,41 @@ class BP_Activity_Activity {
 			$retval['comments'] = $comments;
 		}
 
-		if ( ! $retval['reactions'] ) {
-			$reactions = wp_list_filter( $reactions, array( 'type' => 'activity_comment' ), 'NOT' );
+		if ( ! $retval['interactions'] ) {
+			$interactions = wp_list_filter( $interactions, array( 'type' => 'activity_comment' ), 'NOT' );
 
-			if ( ! $reactions ) {
-				$reactions_cache_value = 'none';
+			if ( ! $interactions ) {
+				$interactions_cache_value = 'none';
 			} else {
-				$reactions_cache_value = $reactions;
+				$interactions_cache_value = $interactions;
 			}
 
-			wp_cache_set( $activity_id, $reactions_cache_value, 'bp_activity_reactions' );
+			wp_cache_set( $activity_id, $interactions_cache_value, 'bp_activity_interactions' );
 
-			$retval['reactions'] = $reactions;
+			$retval['interactions'] = $interactions;
 		}
 
-		// Return comments & reactions.
+		// Return comments & interactions.
 		return $retval;
 	}
 
 	/**
-	 * Append activity reactions to their associated activity items.
+	 * Append activity interactions to their associated activity items.
 	 *
 	 * @since 14.0.0
 	 *
-	 * @param array  $activities Activities to fetch reactions for.
+	 * @param array  $activities Activities to fetch interactions for.
 	 * @param string $spam       Optional. 'ham_only' (default), 'spam_only' or 'all'.
-	 * @return array The updated activities with nested reactions.
+	 * @return array The updated activities with nested interactions.
 	 */
-	public static function append_reactions( $activities, $spam = 'ham_only' ) {
-		$activity_reactions = array();
+	public static function append_interactions( $activities, $spam = 'ham_only' ) {
+		$activity_interactions = array();
 
-		// Now fetch the activity reactions and parse them into the correct position in the activities array.
+		// Now fetch the activity interactions and parse them into the correct position in the activities array.
 		foreach ( (array) $activities as $activity ) {
 			$top_level_parent_id = 0;
 
-			if ( in_array( $activity->type, bp_get_activity_types_for_role( 'reaction' ), true ) ) {
+			if ( in_array( $activity->type, bp_get_activity_types_for_role( 'interaction' ), true ) ) {
 				$top_level_parent_id = $activity->item_id;
 			}
 
@@ -1887,18 +1887,18 @@ class BP_Activity_Activity {
 			 */
 			if ( 'activity_comment' === $activity->type && apply_filters( 'bp_use_legacy_activity_query', false, 'BP_Activity_Activity::get_activity_comments', $function_args ) ) {
 				list( $activity_id, $left, $right, $spam, $top_level_parent_id ) = $function_args;
-				$activity_reactions[ $activity->id ] = BP_Activity_Activity::get_activity_comments( $activity_id, $left, $right, $spam, $top_level_parent_id );
+				$activity_interactions[ $activity->id ] = BP_Activity_Activity::get_activity_comments( $activity_id, $left, $right, $spam, $top_level_parent_id );
 
 			} else {
-				$activity_reactions[ $activity->id ] = BP_Activity_Activity::get_activity_reactions( $args );
+				$activity_interactions[ $activity->id ] = BP_Activity_Activity::get_activity_interactions( $args );
 			}
 		}
 
-		// Merge the reactions with the activity items.
+		// Merge the interactions with the activity items.
 		foreach ( (array) $activities as $key => $activity ) {
-			if ( isset( $activity_reactions[$activity->id] ) ) {
-				$activities[ $key ]->children  = $activity_reactions[ $activity->id ]['comments'];
-				$activities[ $key ]->reactions = $activity_reactions[ $activity->id ]['reactions'];
+			if ( isset( $activity_interactions[$activity->id] ) ) {
+				$activities[ $key ]->children     = $activity_interactions[ $activity->id ]['comments'];
+				$activities[ $key ]->interactions = $activity_interactions[ $activity->id ]['interactions'];
 			}
 		}
 
@@ -1920,7 +1920,7 @@ class BP_Activity_Activity {
 	public static function append_comments( $activities, $spam = 'ham_only' ) {
 		_deprecated_function( __METHOD__, '14.0.0' );
 
-		return self::append_reactions( $activities, $spam );
+		return self::append_interactions( $activities, $spam );
 	}
 
 	/**
@@ -2286,29 +2286,28 @@ class BP_Activity_Activity {
 	}
 
 	/**
-	 * Returns the activity IDs a user reacted to.
+	 * Returns the activity IDs a user interacted with.
 	 *
 	 * @since 14.0.0
 	 *
-	 * @param integer $user_id       Required. The user ID.
-	 *                               Defaults to the current user ID.
-	 * @param string  $reaction_type Required. The activity type key name of the reaction.
-	 *                               Defaults to `activity_like`.
-	 * @return array The activity IDs a user reacted to.
+	 * @param integer $user_id          Required. The user ID.
+	 *                                  Defaults to the current user ID.
+	 * @param string  $interaction_type Required. The activity type key name of the interaction.
+	 * @return array The activity IDs a user interacted with.
 	 */
-	public static function get_user_reactions( $user_id, $reaction_type ) {
+	public static function get_user_interactions( $user_id, $interaction_type ) {
 
-		if ( ! in_array( $reaction_type, bp_get_activity_types_for_role( 'reaction' ), true ) ) {
+		if ( ! in_array( $interaction_type, bp_get_activity_types_for_role( 'interaction' ), true ) ) {
 			return array();
 		}
 
-		// Get the user's reactions cache.
-		$user_reactions_cache = wp_cache_get( $user_id, 'bp_activity_user_reactions' );
+		// Get the user's interactions cache.
+		$user_interactions_cache = wp_cache_get( $user_id, 'bp_activity_user_interactions' );
 
-		if ( 'none' === $user_reactions_cache ) {
+		if ( 'none' === $user_interactions_cache ) {
 			return array();
-		} elseif ( ! empty( $user_reactions_cache ) ) {
-			return (array) $user_reactions_cache;
+		} elseif ( ! empty( $user_interactions_cache ) ) {
+			return (array) $user_interactions_cache;
 		}
 
 		if ( empty( $GLOBALS['wpdb'] ) ) {
@@ -2317,16 +2316,16 @@ class BP_Activity_Activity {
 
 		$wpdb           = $GLOBALS['wpdb'];
 		$activity_table = buddypress()->activity->table_name;
-		$sql            = $wpdb->prepare( "SELECT item_id FROM {$activity_table} WHERE user_id = %d AND type = %s", $user_id, $reaction_type );
+		$sql            = $wpdb->prepare( "SELECT item_id FROM {$activity_table} WHERE user_id = %d AND type = %s", $user_id, $interaction_type );
 		$activities     = $wpdb->get_col( $sql );
 
-		$user_reactions_cache_value = $activities;
+		$user_interactions_cache_value = $activities;
 		if ( ! $activities ) {
-			$user_reactions_cache_value = 'none';
+			$user_interactions_cache_value = 'none';
 		}
 
-		// Set the user's reactions cache.
-		wp_cache_set( $user_id, $user_reactions_cache_value, 'bp_activity_user_reactions' );
+		// Set the user's interactions cache.
+		wp_cache_set( $user_id, $user_interactions_cache_value, 'bp_activity_user_interactions' );
 
 		return $activities;
 	}
