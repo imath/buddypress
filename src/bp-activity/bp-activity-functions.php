@@ -311,7 +311,7 @@ function bp_activity_get_userid_from_mentionname( $mentionname ) {
 	return $user_id;
 }
 
-/** Types ******************************************************************/
+/** Types ********************************************************************/
 
 /**
  * Registers an activity type.
