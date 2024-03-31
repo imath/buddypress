@@ -76,6 +76,8 @@ window.bp = window.bp || {};
 			// Activity actions
 			$( '#buddypress [data-bp-list="activity"]' ).on( 'click', '.activity-item', bp.Nouveau, this.activityActions );
 			$( document ).on( 'keydown', this.commentFormAction );
+
+			$( window ).on( 'message', this.injectActivity );
 		},
 
 		/**
@@ -313,6 +315,12 @@ window.bp = window.bp || {};
 					}
 				} );
 			}
+		},
+
+		injectActivity: function( event ) {
+			var activity = event.originalEvent.data && event.originalEvent.data.message && 'postedBPActivity' === event.originalEvent.data.message ? event.originalEvent.data : null;
+
+			console.log( activity );
 		},
 
 		/**
