@@ -1164,7 +1164,7 @@ body.bp-user.settings.general #buddypress.twentytwentyone .wp-pwd:not(.is-open) 
 * @section 8.0 - Classes - Messages, Ajax, Widgets, Buttons
 *-------------------------------------------------------------------------------
 */
-#buddypress.twentytwentyone button,
+#buddypress.twentytwentyone button:not(.components-button),
 #buddypress.twentytwentyone a.button,
 #buddypress.twentytwentyone input[type="submit"],
 #buddypress.twentytwentyone input[type="button"],
@@ -1179,8 +1179,8 @@ body.bp-user.settings.general #buddypress.twentytwentyone .wp-pwd:not(.is-open) 
 	color: var(--button--color-text);
 }
 
-#buddypress.twentytwentyone button:hover,
-#buddypress.twentytwentyone button:focus,
+#buddypress.twentytwentyone button:not(.components-button):hover,
+#buddypress.twentytwentyone button:not(.components-button):focus,
 #buddypress.twentytwentyone a.button:focus,
 #buddypress.twentytwentyone a.button:hover,
 #buddypress.twentytwentyone input[type="submit"]:focus,

@@ -12,7 +12,7 @@
 	// to general theme elements - changing body class would be better though.
 	.buddypress-wrap {
 
-		button,
+		button:not(.components-button),
 		a.button,
 		input[type="submit"],
 		input[type="button"],
@@ -51,8 +51,8 @@
 			padding: 0 8px 1px;
 		}
 
-		button:hover,
-		button:focus,
+		button:not(.components-button):hover,
+		button:not(.components-button):focus,
 		a.button:focus,
 		a.button:hover,
 		input[type="submit"]:focus,

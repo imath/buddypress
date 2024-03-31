@@ -4222,7 +4222,7 @@ body.no-js .buddypress #messages-bulk-management #select-all-messages {
 	top: 0;
 }
 
-.buddypress .buddypress-wrap button,
+.buddypress .buddypress-wrap button:not(.components-button),
 .buddypress .buddypress-wrap a.button,
 .buddypress .buddypress-wrap input[type="submit"],
 .buddypress .buddypress-wrap input[type="button"],
@@ -4260,8 +4260,8 @@ body.no-js .buddypress #messages-bulk-management #select-all-messages {
 	padding: 0 8px 1px;
 }
 
-.buddypress .buddypress-wrap button:hover,
-.buddypress .buddypress-wrap button:focus,
+.buddypress .buddypress-wrap button:not(.components-button):hover,
+.buddypress .buddypress-wrap button:not(.components-button):focus,
 .buddypress .buddypress-wrap a.button:focus,
 .buddypress .buddypress-wrap a.button:hover,
 .buddypress .buddypress-wrap input[type="submit"]:focus,

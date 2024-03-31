@@ -2009,7 +2009,7 @@ body.bp-user.settings.general {
 
 #buddypress.twentytwentytwo {
 
-	button,
+	button:not(.components-button),
 	a.button,
 	input[type="submit"],
 	input[type="button"],
@@ -2024,8 +2024,8 @@ body.bp-user.settings.general {
 		color: var(--wp--preset--color--background);
 	}
 
-	button:hover,
-	button:focus,
+	button:not(.components-button):hover,
+	button:not(.components-button):focus,
 	a.button:focus,
 	a.button:hover,
 	input[type="submit"]:focus,
