@@ -1,7 +1,7 @@
 /* jshint browser: true */
 /* global BP_Nouveau */
 /* @since 3.0.0 */
-/* @version 10.0.0 */
+/* @version 14.0.0 */
 window.bp = window.bp || {};
 
 ( function( bp, $ ) {
@@ -77,7 +77,8 @@ window.bp = window.bp || {};
 			$( '#buddypress [data-bp-list="activity"]' ).on( 'click', '.activity-item', bp.Nouveau, this.activityActions );
 			$( document ).on( 'keydown', this.commentFormAction );
 
-			$( window ).on( 'message', this.injectActivity );
+			// Activity posted using the Block Editor.
+			window.addEventListener( 'message', this.injectActivity, false );
 		},
 
 		/**
@@ -317,10 +318,21 @@ window.bp = window.bp || {};
 			}
 		},
 
+		/**
+		 * Injects an Activity written using the Block Editor.
+		 *
+		 * @since 14.0.0
+		 *
+		 * @param {MessageEvent} event
+		 */
 		injectActivity: function( event ) {
-			var activity = event.originalEvent.data && event.originalEvent.data.message && 'postedBPActivity' === event.originalEvent.data.message ? event.originalEvent.data : null;
+			var justInserted = event.data && event.data.message && 'postedBPActivity' === event.data.message ? event.data : null;
 
-			console.log( activity );
+			if ( justInserted.fully_rendered_activity && ! $( '#activity-' + justInserted.id ).length ) {
+
+				// Prepend the activity.
+				bp.Nouveau.inject( '#activity-stream ul.activity-list', justInserted.fully_rendered_activity, 'prepend' );
+			}
 		},
 
 		/**
