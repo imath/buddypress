@@ -311,6 +311,11 @@ function bp_version_updater() {
 		if ( $raw_db_version < 13422 ) {
 			bp_update_to_12_0();
 		}
+
+		// Version 14.0.0.
+		if ( $raw_db_version < 13785 ) {
+			bp_update_to_14_0();
+		}
 	}
 
 	/* All done! *************************************************************/
@@ -932,6 +937,16 @@ function bp_update_to_12_0() {
 	 * @since 12.0.0
 	 */
 	do_action( 'bp_updated_to_12_0' );
+}
+
+/**
+ * 14.0.0 update routine.
+ *
+ * @since 14.0.0
+ */
+function bp_update_to_14_0() {
+	// The DB stuff is performed by bp_core_install();
+	// We simply need to migrate read notices.
 }
 
 /**
