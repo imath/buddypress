@@ -86,3 +86,54 @@ function bp_admin_email_add_codex_notice() {
 		'error'
 	);
 }
+
+/**
+ * Is the current page the Notices screen?
+ *
+ * Eg http://example.com/members/joe/messages/notices/.
+ *
+ * @since 1.1.0
+ * @deprecated 14.0.0
+ *
+ * @return bool True if the current page is the Notices screen.
+ */
+function bp_is_notices() {
+	_deprecated_function( __FUNCTION__, '14.0.0' );
+	return false;
+}
+
+/**
+ * Handle editing of sitewide notices.
+ *
+ * @since 2.4.0 This function was split from messages_screen_notices(). See #6505.
+ * @deprecated 14.0.0
+ *
+ * @return void
+ */
+function bp_messages_action_edit_notice() {
+	_deprecated_function( __FUNCTION__, '14.0.0' );
+}
+
+/**
+ * Handle user dismissal of sitewide notices.
+ *
+ * @since 9.0.0
+ * @deprecated 14.0.0
+ *
+ * @return bool False on failure.
+ */
+function bp_messages_action_dismiss_notice() {
+	_deprecated_function( __FUNCTION__, '14.0.0' );
+}
+
+/**
+ * Load the Messages > Notices screen.
+ *
+ * @since 1.0.0
+ * @deprecated 14.0.0
+ *
+ * @return void
+ */
+function messages_screen_notices() {
+	_deprecated_function( __FUNCTION__, '14.0.0' );
+}
