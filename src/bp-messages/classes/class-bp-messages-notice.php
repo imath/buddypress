@@ -5,12 +5,13 @@
  * @package BuddyPress
  * @subpackage MessagesClasses
  * @since 1.0.0
+ * @deprecated 14.0.0
  */
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
 
-_deprecated_file( basename( __FILE__ ), '14.0.0', '', __( 'BuddyPress Site-Wide Notices became Community Notices, please use the `BP_Members_Notice()` class instead.', 'buddypress' ) );
+_deprecated_file( basename( __FILE__ ), '14.0.0', '/wp-content/plugins/buddypress/bp-members/classes/class-bp-members-notice.php', __( 'BuddyPress Site-Wide Notices became Community Notices, please use the `BP_Members_Notice()` class instead.', 'buddypress' ) );
 
 /**
  * BuddyPress Notices class.

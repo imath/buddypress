@@ -313,7 +313,7 @@ function bp_version_updater() {
 		}
 
 		// Version 14.0.0.
-		if ( $raw_db_version < 13785 ) {
+		if ( $raw_db_version < 13856 ) {
 			bp_update_to_14_0();
 		}
 	}

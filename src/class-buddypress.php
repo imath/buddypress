@@ -461,7 +461,7 @@ class BuddyPress {
 		/** Versions */
 
 		$this->version    = '14.0.0-alpha';
-		$this->db_version = 13785;
+		$this->db_version = 13856;
 
 		/** Loading */
 
