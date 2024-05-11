@@ -210,40 +210,6 @@ function messages_new_message( $args = '' ) {
 }
 
 /**
- * Send a notice.
- *
- * @param string $subject Subject of the notice.
- * @param string $message Content of the notice.
- * @return bool True on success, false on failure.
- */
-function messages_send_notice( $subject, $message ) {
-
-	if ( ! bp_current_user_can( 'bp_moderate' ) || empty( $subject ) || empty( $message ) ) {
-		return false;
-	}
-
-	$notice            = new BP_Members_Notice;
-	$notice->subject   = $subject;
-	$notice->message   = $message;
-	$notice->date_sent = bp_core_current_time();
-	$notice->is_active = 1;
-	$notice->save(); // Send it.
-
-	/**
-	 * Fires after a notice has been successfully sent.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @param string             $subject Subject of the notice.
-	 * @param string             $message Content of the notice.
-	 * @param BP_Members_Notice $notice  Notice object sent.
-	 */
-	do_action_ref_array( 'messages_send_notice', array( $subject, $message, $notice ) );
-
-	return true;
-}
-
-/**
  * Deletes message thread(s) for a given user.
  *
  * Note that "deleting" a thread for a user means removing it from the user's
