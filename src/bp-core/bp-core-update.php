@@ -942,11 +942,16 @@ function bp_update_to_12_0() {
 /**
  * 14.0.0 update routine.
  *
+ * The DB migration tasks are performed by `bp_core_install()`.
+ *
  * @since 14.0.0
  */
 function bp_update_to_14_0() {
-	// The DB stuff is performed by bp_core_install();
-	// We simply need to migrate read notices.
+	$cached_active_notice = wp_cache_get( 'active_notice', 'bp_messages' );
+	if ( $cached_active_notice ) {
+		wp_cache_set( 'active_notice', $cached_active_notice, 'bp_notices' );
+		wp_cache_delete( 'active_notice', 'bp_messages' );
+	}
 }
 
 /**

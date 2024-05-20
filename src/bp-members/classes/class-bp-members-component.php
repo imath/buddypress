@@ -738,10 +738,13 @@ class BP_Members_Component extends BP_Component {
 	public function setup_cache_groups() {
 
 		// Global groups.
-		wp_cache_add_global_groups( array(
-			'bp_last_activity',
-			'bp_member_member_type',
-		) );
+		wp_cache_add_global_groups(
+			array(
+				'bp_last_activity',
+				'bp_member_member_type',
+				'bp_notices',
+			)
+		);
 
 		parent::setup_cache_groups();
 	}
