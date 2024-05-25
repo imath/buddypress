@@ -313,7 +313,7 @@ function bp_version_updater() {
 		}
 
 		// Version 14.0.0.
-		if ( $raw_db_version < 13856 ) {
+		if ( $raw_db_version < 13875 ) {
 			bp_update_to_14_0();
 		}
 	}
@@ -952,6 +952,8 @@ function bp_update_to_14_0() {
 		wp_cache_set( 'active_notice', $cached_active_notice, 'bp_notices' );
 		wp_cache_delete( 'active_notice', 'bp_messages' );
 	}
+
+	_bp_members_dismissed_notices_migrate();
 }
 
 /**
