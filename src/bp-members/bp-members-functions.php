@@ -642,48 +642,6 @@ function bp_core_get_active_member_count() {
 }
 
 /**
- * Update the spam status of the member on multisite configs.
- *
- * @since 5.0.0
- *
- * @param int    $user_id The user ID to spam or ham.
- * @param string $value   '0' to mark the user as `ham`, '1' to mark as `spam`.
- * @return bool          True if the spam status of the member changed.
- *                       False otherwise.
- */
-function bp_core_update_member_status( $user_id = 0, $value = 0 ) {
-	if ( ! is_multisite() || ! $user_id ) {
-		return false;
-	}
-
-	/**
-	 * The `update_user_status()` function is deprecated since WordPress 5.3.0.
-	 * Continue to use it if WordPress current major version is lower than 5.3.
-	 */
-	if ( bp_get_major_wp_version() < 5.3 ) {
-		return update_user_status( $user_id, 'spam', $value );
-	}
-
-	if ( $value ) {
-		$value = '1';
-	}
-
-	// Otherwise use the replacement function.
-	$user = wp_update_user(
-		array(
-			'ID'   => $user_id,
-			'spam' => $value,
-		)
-	);
-
-	if ( is_wp_error( $user ) ) {
-		return false;
-	}
-
-	return true;
-}
-
-/**
  * Process a spammed or unspammed user.
  *
  * This function is called from three places:
@@ -710,12 +668,12 @@ function bp_core_process_spammer_status( $user_id, $status, $do_wp_cleanup = tru
 
 	// Bail if no user ID.
 	if ( empty( $user_id ) ) {
-		return;
+		return false;
 	}
 
 	// Bail if user ID is super admin.
 	if ( is_super_admin( $user_id ) ) {
-		return;
+		return false;
 	}
 
 	// Get the functions file.
@@ -776,18 +734,16 @@ function bp_core_process_spammer_status( $user_id, $status, $do_wp_cleanup = tru
 				update_blog_status( $site_id, 'spam', $is_spam );
 			}
 		}
-
-		// Finally, mark this user as a spammer.
-		bp_core_update_member_status( $user_id, $is_spam );
 	}
 
-	// Update the user status.
-	$wpdb->update( $wpdb->users, array( 'user_status' => $is_spam ), array( 'ID' => $user_id ) );
-
-	// Clean user cache.
-	clean_user_cache( $user_id );
-
+	// Update user status on non-multisite configs.
 	if ( ! is_multisite() ) {
+		// We need to perform the query as WordPress sends an error when using `wp_update_user()` for non-multisite configs.
+		$wpdb->update( $wpdb->users, array( 'user_status' => $is_spam ), array( 'ID' => $user_id ) );
+
+		// Clean user cache.
+		clean_user_cache( $user_id );
+
 		// Call multisite actions in single site mode for good measure.
 		if ( true === $is_spam ) {
 
@@ -809,6 +765,19 @@ function bp_core_process_spammer_status( $user_id, $status, $do_wp_cleanup = tru
 			 * @param int $value user ID.
 			 */
 			do_action( 'make_ham_user', $user_id );
+		}
+
+		// Update user status on multisite configs.
+	} else {
+		$updated_user = wp_update_user(
+			array(
+				'ID'   => $user_id,
+				'spam' => $is_spam ? '1' : '0',
+			)
+		);
+
+		if ( is_wp_error( $updated_user ) ) {
+			return false;
 		}
 	}
 
